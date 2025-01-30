@@ -20,6 +20,21 @@ Dockerized weather API wrapper for open-meteo.com built with Python and Flask.
   - None of the above (Berlin coordinates)
 
 ## Quick Start
+You can access through either the web interface or the REST API endpoint.
+
+### Web Interface
+When running the container, the web interface will be available at `http://localhost:5000`.
+
+### REST API
+The REST API endpoint by entering the latitude and longitude, for example, `http://localhost:5000/weather?lat=33.4484&lon=-112.0740&unit=fahrenheit`.
+The results will be returned in JSON format, for example:
+```json
+{
+  "local_time": "2025-01-30 18:09:48",
+  "temperature": 52.9,
+  "unit": "°F"
+}
+```
 
 Build the Docker container:
 ```bash
@@ -47,8 +62,9 @@ docker build -t weather-app .
    
    docker run -p 8000:8000 weather-api
    
+```
 
-The API will be available at `http://localhost:8000`.
+The API will be available at `http://localhost:5000`.
 
 ## API Documentation
 
@@ -60,7 +76,7 @@ Method: `GET`
 
 Query Parameters:
 - `location` (required): City name or coordinates (latitude,longitude)
-- `units` (optional): 'metric' or 'imperial' (default: 'metric')
+- `unit` (optional): 'celsius' or 'fahrenheit' (default: 'celsius')
 
 Example Request:
 
