@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Weather App</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .container { margin-top: 20px; }
+        .result { margin-top: 20px; padding: 10px; background-color: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <h1>Weather App</h1>
+
+    <div class="container">
+        <h3>Select a City:</h3>
+        {% for city in cities %}
+        <input type="radio" name="city" value="{{ city }}"
+               data-lat="{{ cities[city].lat }}"
+               data-lon="{{ cities[city].lon }}"
+               data-unit="{{ cities[city].default_unit }}"
+               {% if city == "Phoenix, AZ" %}checked{% endif %}>
+        <label>{{ city }}</label><br>
+        {% endfor %}
+
+        <h3>Temperature Unit:</h3>
+        <input type="radio" name="unit" value="celsius" id="celsius">
+        <label for="celsius">Celsius (°C)</label><br>
+        <input type="radio" name="unit" value="fahrenheit" id="fahrenheit">
+        <label for="fahrenheit">Fahrenheit (°F)</label><br>
+
+        <button onclick="getWeather()" style="margin-top: 20px;">Get Weather</button>
+
+        <div id="result" class="result" style="display: none;">
+            <p>Local Time: <span id="local-time"></span></p>
+            <p>Current Temperature: <span id="temperature"></span></p>
+        </div>
+    </div>
+
+    <script>
+        // Set initial city and unit
+        document.addEventListener('DOMContentLoaded', function() {
+            const defaultCity = document.querySelector('input[name="city"]:checked');
+            const defaultUnit = defaultCity.dataset.unit;
+            document.querySelector(`input[value="${defaultUnit}"]`).checked = true;
+        });
+
+        // Update unit when city changes
+        document.querySelectorAll('input[name="city"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const defaultUnit = this.dataset.unit;
+                document.querySelector(`input[value="${defaultUnit}"]`).checked = true;
+            });
+        });
+
+        function getWeather() {
+            const selectedCity = document.querySelector('input[name="city"]:checked');
+            const selectedUnit = document.querySelector('input[name="unit"]:checked');
+
+            const lat = selectedCity.dataset.lat;
+            const lon = selectedCity.dataset.lon;
+            const unit = selectedUnit.value;
+
+            fetch(`/weather?lat=${lat}&lon=${lon}&unit=${unit}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('local-time').textContent = data.local_time;
+                    document.getElementById('temperature').textContent =
+                        `${data.temperature}${data.unit}`;
+                    document.getElementById('result').style.display = 'block';
+                })
+                .catch(error => console.error('Error:', error));
+        }
+    </script>
+</body>
+</html>
