@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
 
+import requests
 from flask import Flask, render_template, request, jsonify
 
 # Configure logging
@@ -25,17 +26,26 @@ CITIES = {
 
 
 def get_weather_data(lat, lon, unit):
-    """Simulate weather data retrieval"""
+    """Get real weather data from Open-Meteo API"""
     logger.info(f'Getting weather for lat:{lat}, lon:{lon}, unit:{unit}')
-    # Replace with actual weather API call
-    temp = 75 if unit == 'fahrenheit' else 24
+
+    url = "https://api.open-meteo.com/v1/forecast"
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "temperature_unit": "fahrenheit" if unit == "fahrenheit" else "celsius",
+        "current": "temperature_2m",
+        "timezone": "auto"
+    }
+
+    response = requests.get(url, params=params)
+    data = response.json()
+
     return {
-        'temperature': temp,
+        'temperature': data['current']['temperature_2m'],
         'unit': '°F' if unit == 'fahrenheit' else '°C',
         'local_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
-
-
 @app.route('/')
 def index():
     logger.info('Loading index page')
