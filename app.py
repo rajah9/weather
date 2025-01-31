@@ -4,8 +4,7 @@ from datetime import datetime
 import pytz
 import requests
 from flask import Flask, render_template, request, jsonify
-
-_TEMP_UNITS = ["fahrenheit", "celsius"]
+from flask_restx import Api, Resource, fields
 
 # Configure logging
 logging.basicConfig(
@@ -16,7 +15,28 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-CITIES = {
+# Initialize Flask-RestX
+api = Api(app, version='1.0', title='Weather API',
+    description='A simple weather API with city temperature information',
+    doc='/api')
+
+# Define namespaces
+ns = api.namespace('weather', description='Weather operations')
+
+# Define models
+weather_model = api.model('Weather', {
+    'temperature': fields.Float(description='Temperature value'),
+    'unit': fields.String(description='Temperature unit (°F or °C)'),
+    'local_time': fields.String(description='Local time at location')
+})
+
+location_parser = api.parser()
+location_parser.add_argument('lat', type=float, required=True, help='Latitude')
+location_parser.add_argument('lon', type=float, required=True, help='Longitude')
+location_parser.add_argument('unit', type=str, required=True, help='Temperature unit (fahrenheit/celsius)')
+
+_TEMP_UNITS = ["fahrenheit", "celsius"]
+_CITIESCITIES = {
     "Phoenix, AZ": {"lat": 33.4484, "lon": -112.0740, "default_unit": "fahrenheit", "timezone": "America/Phoenix"},
     "Seattle, WA": {"lat": 47.6062, "lon": -122.3321, "default_unit": "celsius", "timezone": "America/Los_Angeles"},
     "New York, NY": {"lat": 40.7128, "lon": -74.0060, "default_unit": "fahrenheit", "timezone": "America/New_York"},
@@ -27,30 +47,17 @@ CITIES = {
     "Tokyo, Japan": {"lat": 35.6762, "lon": 139.6503, "default_unit": "celsius", "timezone": "Asia/Tokyo"}
 }
 
-
 def guess_tz(lon: float) -> pytz.timezone:
     """
     Calculate timezone from longitude coordinate
-
-    Args:
-        lon: Longitude coordinate
-
-    Returns:
-        pytz.timezone object for the estimated timezone
     """
     utc_offset: int = round(lon / 15)
     tz_name: str = f"Etc/GMT{'+' if utc_offset < 0 else '-'}{abs(utc_offset)}" if utc_offset else "Etc/GMT"
     return pytz.timezone(tz_name)
 
-
 def get_weather_data(lat: float, lon: float, unit: str, city: str = None) -> dict:
     """
     Get real weather data from Open-Meteo API with correct local time.
-    :param lat:     latitude
-    :param lon:     longitude
-    :param unit:    unit of temperature, either 'fahrenheit' or 'celsius'
-    :param city:    city name (optional)
-    :return:
     """
     unit = unit.lower()
     if unit not in _TEMP_UNITS:
@@ -63,13 +70,13 @@ def get_weather_data(lat: float, lon: float, unit: str, city: str = None) -> dic
         "longitude": lon,
         "temperature_unit": unit,
         "current": "temperature_2m",
-        "timezone": CITIES[city]["timezone"] if city in CITIES else "auto"
+        "timezone": _CITIESCITIES[city]["timezone"] if city in _CITIESCITIES else "auto"
     }
 
     response = requests.get(url, params=params)
     data = response.json()
 
-    tz = pytz.timezone(CITIES[city]["timezone"]) if city in CITIES else guess_tz(lon)
+    tz = pytz.timezone(_CITIESCITIES[city]["timezone"]) if city in _CITIESCITIES else guess_tz(lon)
     local_time = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S %Z')
 
     return {
@@ -78,24 +85,21 @@ def get_weather_data(lat: float, lon: float, unit: str, city: str = None) -> dic
         'local_time': local_time
     }
 
-
-@app.route('/')
+# HTML interface route
+@app.route('/cities')
 def index():
     logger.info('Loading index page')
-    return render_template('index.html', cities=CITIES)
+    return render_template('index.html', cities=_CITIESCITIES)
 
-
-@app.route('/weather')
-def weather():
-    lat = float(request.args.get('lat'))
-    lon = float(request.args.get('lon'))
-    unit = request.args.get('unit')
-    logger.info(f'Weather request received - lat:{lat}, lon:{lon}, unit:{unit}')
-
-    weather_data = get_weather_data(lat, lon, unit)
-    logger.info(f'Returning weather data: {weather_data}')
-    return jsonify(weather_data)
-
+# API routes with Swagger
+@ns.route('/')
+class WeatherResource(Resource):
+    @ns.doc('get_weather')
+    @ns.expect(location_parser)
+    @ns.marshal_with(weather_model)
+    def get(self):
+        args = location_parser.parse_args()
+        return get_weather_data(args['lat'], args['lon'], args['unit'])
 
 if __name__ == '__main__':
     logger.info('Starting Weather App')
