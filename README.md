@@ -18,8 +18,9 @@ Dockerized weather API wrapper for open-meteo.com built with Python and Flask.
   - Vancouver, BC
   - Tokyo, Japan
 - 
-You can also specify your own location by entering the latitude and longitude, for example:
-  - None of the above (Berlin coordinates)
+You can also specify your own location by entering the latitude and longitude. For the Greenwich observatory, use:
+- Latitude: 51.4778
+- Longitude: 0.0015
 
 ## Quick Start
 You can access the weather service through three different interfaces:
