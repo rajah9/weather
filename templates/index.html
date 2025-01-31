@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Weather App</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .container { margin-top: 20px; }
+        .result { margin-top: 20px; padding: 10px; background-color: #f0f0f0; }
+        .coordinates { margin-top: 20px; }
+        .coordinates input { width: 100px; margin-right: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Weather App</h1>
+
+    <div class="container">
+        <h3>Select a City:</h3>
+        <input type="radio" name="city" value="None" id="none">
+        <label>I'll enter the longitude and latitude myself</label><br>
+        {% for city in cities %}
+        <input type="radio" name="city" value="{{ city }}"
+               data-lat="{{ cities[city].lat }}"
+               data-lon="{{ cities[city].lon }}"
+               data-unit="{{ cities[city].default_unit }}"
+               {% if city == "Phoenix, AZ" %}checked{% endif %}>
+        <label>{{ city }}</label><br>
+        {% endfor %}
+
+        <div class="coordinates">
+            <label>Latitude:</label>
+            <input type="number" step="0.000001" id="latitude">
+            <label>Longitude:</label>
+            <input type="number" step="0.000001" id="longitude">
+        </div>
+
+        <h3>Temperature Unit:</h3>
+        <input type="radio" name="unit" value="celsius" id="celsius">
+        <label for="celsius">Celsius (°C)</label><br>
+        <input type="radio" name="unit" value="fahrenheit" id="fahrenheit">
+        <label for="fahrenheit">Fahrenheit (°F)</label><br>
+
+        <button onclick="getWeather()" style="margin-top: 20px;">Get Weather</button>
+
+        <div id="result" class="result" style="display: none;">
+            <p>Local Time: <span id="local-time"></span></p>
+            <p>Current Temperature: <span id="temperature"></span></p>
+        </div>
+    </div>
+
+    <script>
+        const latInput = document.getElementById('latitude');
+        const lonInput = document.getElementById('longitude');
+
+        // Set initial city and unit
+        document.addEventListener('DOMContentLoaded', function() {
+            const defaultCity = document.querySelector('input[name="city"]:checked');
+            const defaultUnit = defaultCity.dataset.unit;
+            document.querySelector(`input[value="${defaultUnit}"]`).checked = true;
+            latInput.value = defaultCity.dataset.lat;
+            lonInput.value = defaultCity.dataset.lon;
+        });
+
+        // Update coordinates when city changes
+        document.querySelectorAll('input[name="city"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const defaultUnit = this.dataset.unit;
+                document.querySelector(`input[value="${defaultUnit}"]`).checked = true;
+                if (this.value !== "None") {
+                    latInput.value = this.dataset.lat;
+                    lonInput.value = this.dataset.lon;
+                }
+            });
+        });
+
+        // Select "None of the above" when coordinates are manually changed
+        latInput.addEventListener('input', function() {
+            document.getElementById('none').checked = true;
+        });
+        lonInput.addEventListener('input', function() {
+            document.getElementById('none').checked = true;
+        });
+
+        function getWeather() {
+            const lat = latInput.value;
+            const lon = lonInput.value;
+            const selectedUnit = document.querySelector('input[name="unit"]:checked');
+            const unit = selectedUnit.value;
+
+            fetch(`/weather?lat=${lat}&lon=${lon}&unit=${unit}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Weather data received:', data);  // Debug log
+                    document.getElementById('local-time').textContent = data.local_time;
+                    document.getElementById('temperature').textContent =
+                        `${data.temperature}${data.unit}`;
+                    document.getElementById('result').style.display = 'block';
+                })
+                .catch(error => console.error('Error:', error));
+        }
+    </script>
+</body>
+</html>
