@@ -17,18 +17,22 @@ Dockerized weather API wrapper for open-meteo.com built with Python and Flask.
   - Charlotte, NC
   - Vancouver, BC
   - Tokyo, Japan
+- 
+You can also specify your own location by entering the latitude and longitude, for example:
   - None of the above (Berlin coordinates)
 
 ## Quick Start
-You can access through either the web interface or the REST API endpoint.
+You can access the weather service through three different interfaces:
 
-### Web Interface
-When running the container, the web interface will be available at `http://localhost:5000`.
+### 1. Web Interface
+The web interface is available at `http://localhost:5000/cities` when running the container. It provides a user-friendly way to select cities or enter custom coordinates.
 
-### REST API
-The REST API endpoint by entering the latitude and longitude, for example, `http://localhost:5000/weather?lat=33.4484&lon=-112.0740&unit=fahrenheit`.
-The results will be returned in JSON format, for example:
+### 2. REST API Endpoint
+Access weather data directly via HTTP GET requests:
 ```json
+GET http://localhost:5000/weather?lat=33.4484&lon=-112.0740&unit=fahrenheit
+
+Response:
 {
   "local_time": "2025-01-30 18:09:48",
   "temperature": 52.9,
@@ -36,7 +40,17 @@ The results will be returned in JSON format, for example:
 }
 ```
 
-Build the Docker container:
+### 3. Swagger UI
+Interactive API documentation is available at http://localhost:5000/api/. 
+
+This interface allows you to:
+
+- Explore available endpoints
+- Test API calls directly from the browser
+- View request/response schemas
+- Try out different parameters
+
+# Build the Docker container:
 ```bash
 docker build -t weather-app .
 ## Features
@@ -60,7 +74,7 @@ docker build -t weather-app .
 
 3. Run the container:
    
-   docker run -p 8000:8000 weather-api
+   docker run -p 5000:5000 weather-app
    
 ```
 
