@@ -38,12 +38,18 @@
         <label for="celsius">Celsius (°C)</label><br>
         <input type="radio" name="unit" value="fahrenheit" id="fahrenheit">
         <label for="fahrenheit">Fahrenheit (°F)</label><br>
-
         <button onclick="getWeather()" style="margin-top: 20px;">Get Weather</button>
+        <button onclick="getForecast()" style="margin-top: 20px;">Get Forecast</button>
 
         <div id="result" class="result" style="display: none;">
             <p>Local Time: <span id="local-time"></span></p>
             <p>Current Temperature: <span id="temperature"></span></p>
+        </div>
+
+        <div id="forecast-result" class="result" style="display: none;">
+            <h3>3-Day Forecast</h3>
+            <div id="hourly-forecast"></div>
+            <div id="daily-forecast"></div>
         </div>
     </div>
 
@@ -99,6 +105,41 @@
                     document.getElementById('temperature').textContent =
                         `${data.temperature}${data.unit}`;
                     document.getElementById('result').style.display = 'block';
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        function getForecast() {
+            const lat = latInput.value;
+            const lon = lonInput.value;
+            const selectedUnit = document.querySelector('input[name="unit"]:checked');
+            const unit = selectedUnit.value;
+
+            fetch(`/weather/forecast?lat=${lat}&lon=${lon}&unit=${unit}`)
+                .then(response => response.json())
+                .then(data => {
+                    const hourlyDiv = document.getElementById('hourly-forecast');
+                    const dailyDiv = document.getElementById('daily-forecast');
+
+                    // Display hourly data
+                    hourlyDiv.innerHTML = '<h4>Next 24 Hours</h4>';
+                    data.hourly.forEach(hour => {
+                        hourlyDiv.innerHTML += `
+                            <p>${hour.time}: ${hour.temp}${data.unit},
+                            Precipitation: ${hour.precipitation_prob}%,
+                            Conditions: ${hour.weather_desc}</p>`;
+                    });
+
+                    // Display daily data
+                    dailyDiv.innerHTML = '<h4>Daily Overview</h4>';
+                    data.daily.forEach(day => {
+                        dailyDiv.innerHTML += `
+                            <p>${day.date}: High ${day.temp_max}${data.unit},
+                            Low ${day.temp_min}${data.unit},
+                            Precipitation: ${day.precipitation_sum}mm</p>`;
+                    });
+
+                    document.getElementById('forecast-result').style.display = 'block';
                 })
                 .catch(error => console.error('Error:', error));
         }

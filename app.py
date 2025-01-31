@@ -36,7 +36,7 @@ location_parser.add_argument('lon', type=float, required=True, help='Longitude')
 location_parser.add_argument('unit', type=str, required=True, help='Temperature unit (fahrenheit/celsius)')
 
 _TEMP_UNITS = ["fahrenheit", "celsius"]
-_CITIESCITIES = {
+_CITIES = {
     "Phoenix, AZ": {"lat": 33.4484, "lon": -112.0740, "default_unit": "fahrenheit", "timezone": "America/Phoenix"},
     "Seattle, WA": {"lat": 47.6062, "lon": -122.3321, "default_unit": "celsius", "timezone": "America/Los_Angeles"},
     "New York, NY": {"lat": 40.7128, "lon": -74.0060, "default_unit": "fahrenheit", "timezone": "America/New_York"},
@@ -55,6 +55,7 @@ def guess_tz(lon: float) -> pytz.timezone:
     tz_name: str = f"Etc/GMT{'+' if utc_offset < 0 else '-'}{abs(utc_offset)}" if utc_offset else "Etc/GMT"
     return pytz.timezone(tz_name)
 
+
 def get_weather_data(lat: float, lon: float, unit: str, city: str = None) -> dict:
     """
     Get real weather data from Open-Meteo API with correct local time.
@@ -70,13 +71,13 @@ def get_weather_data(lat: float, lon: float, unit: str, city: str = None) -> dic
         "longitude": lon,
         "temperature_unit": unit,
         "current": "temperature_2m",
-        "timezone": _CITIESCITIES[city]["timezone"] if city in _CITIESCITIES else "auto"
+        "timezone": _CITIES[city]["timezone"] if city in _CITIES else "auto"
     }
 
     response = requests.get(url, params=params)
     data = response.json()
 
-    tz = pytz.timezone(_CITIESCITIES[city]["timezone"]) if city in _CITIESCITIES else guess_tz(lon)
+    tz = pytz.timezone(_CITIES[city]["timezone"]) if city in _CITIES else guess_tz(lon)
     local_time = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S %Z')
 
     return {
@@ -85,11 +86,80 @@ def get_weather_data(lat: float, lon: float, unit: str, city: str = None) -> dic
         'local_time': local_time
     }
 
+def get_weather_forecast(lat: float, lon: float, unit: str, city: str = None) -> dict:
+    """
+    Get weather forecast data from Open-Meteo API including hourly and daily predictions.
+    """
+    unit = unit.lower()
+    logger.info(f'Getting forecast for lat:{lat}, lon:{lon}, unit:{unit}, city:{city}')
+
+    url = "https://api.open-meteo.com/v1/forecast"
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "temperature_unit": unit,
+        "hourly": ["temperature_2m", "precipitation_probability", "weathercode"],
+        "daily": ["temperature_2m_max", "temperature_2m_min", "precipitation_sum"],
+        "timezone": _CITIES[city]["timezone"] if city in _CITIES else "auto",
+        "forecast_days": 3
+    }
+
+    response = requests.get(url, params=params)
+    data = response.json()
+
+    # Process hourly data for next 24 hours
+    hourly_forecast = []
+    for i in range(24):
+        hourly_forecast.append({
+            "time": data['hourly']['time'][i],
+            "temp": data['hourly']['temperature_2m'][i],
+            "precipitation_prob": data['hourly']['precipitation_probability'][i],
+            "weather_desc": get_weather_description(data['hourly']['weathercode'][i])
+        })
+
+    # Process daily data
+    daily_forecast = []
+    for i in range(3):
+        daily_forecast.append({
+            "date": data['daily']['time'][i],
+            "temp_max": data['daily']['temperature_2m_max'][i],
+            "temp_min": data['daily']['temperature_2m_min'][i],
+            "precipitation_sum": data['daily']['precipitation_sum'][i]
+        })
+
+    return {
+        "hourly": hourly_forecast,
+        "daily": daily_forecast,
+        "unit": '°F' if unit == 'fahrenheit' else '°C'
+    }
+
+def get_weather_description(code: int) -> str:
+    """Convert weather code to human-readable description."""
+    weather_codes = {
+        0: "Clear sky",
+        1: "Mainly clear",
+        2: "Partly cloudy",
+        3: "Overcast",
+        45: "Foggy",
+        48: "Depositing rime fog",
+        51: "Light drizzle",
+        53: "Moderate drizzle",
+        55: "Dense drizzle",
+        61: "Slight rain",
+        63: "Moderate rain",
+        65: "Heavy rain",
+        71: "Slight snow fall",
+        73: "Moderate snow fall",
+        75: "Heavy snow fall",
+        95: "Thunderstorm"
+    }
+    return weather_codes.get(code, "Unknown")
+
 # HTML interface route
 @app.route('/cities')
 def index():
     logger.info('Loading index page')
-    return render_template('index.html', cities=_CITIESCITIES)
+    return render_template('index.html', cities=_CITIES)
 
 # API routes with Swagger
 @ns.route('/')
@@ -101,6 +171,14 @@ class WeatherResource(Resource):
         args = location_parser.parse_args()
         return get_weather_data(args['lat'], args['lon'], args['unit'])
 
+# Add new route in the API section
+@ns.route('/forecast')
+class WeatherForecastResource(Resource):
+    @ns.doc('get_forecast')
+    @ns.expect(location_parser)
+    def get(self):
+        args = location_parser.parse_args()
+        return get_weather_forecast(args['lat'], args['lon'], args['unit'])
 if __name__ == '__main__':
     logger.info('Starting Weather App')
     app.run(host='0.0.0.0', port=5000)
