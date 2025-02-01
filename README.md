@@ -51,9 +51,30 @@ This interface allows you to:
 - View request/response schemas
 - Try out different parameters
 
+## Weather Forecast Feature
+The application includes an AI-powered forecast feature that provides natural language weather predictions:
+
+1. Click the "Get Forecast" button to receive a friendly, conversational 3-day forecast
+2. The forecast is generated using OpenAI's GPT-3.5-turbo model, transforming raw weather data into an engaging narrative
+3. The forecast includes:
+   - Temperature highs and lows
+   - Precipitation predictions
+   - Weather conditions
+   - Location-specific details when available
+
+Example forecast:
+
+_Good morning! Looking at the weather for Phoenix, AZ, you can expect a warm and sunny day ahead. 
+Today's high will reach 85°F with a low of 65°F. There's only a 5% chance of precipitation, 
+making it perfect for outdoor activities. The next couple of days will remain consistently pleasant..._
+
+Note: This feature requires an OpenAI API key configured in the environment variables.
+
+
 # Build the Docker container:
 ```bash
 docker build -t weather-app .
+```
 ## Features
 
 - Retrieve current weather data for a given location
@@ -71,17 +92,14 @@ docker build -t weather-app .
 2. Build the Docker image:
    
    docker build -t weather-api .
-   
 
 3. Run the container:
    
    docker run -p 5000:5000 weather-app
-   
-```
-
-The API will be available at `http://localhost:5000`.
 
 ## API Documentation
+
+The API will be available at `http://localhost:5000/weather`.
 
 ### Get Current Weather
 
@@ -109,13 +127,6 @@ Example Response:
 }
 
 
-## Development Guidelines
-
-1. Follow PEP 8 style guide for Python code.
-2. Write unit tests for new features and bug fixes.
-3. Use meaningful commit messages and create pull requests for review.
-4. Update documentation when adding or modifying features.
-
 ## Contributing
 
 Contributions are welcome! Please read the [CONTRIBUTING.md](CONTRIBUTING.md) file for details on our code of conduct and the process for submitting pull requests.
@@ -123,3 +134,5 @@ Contributions are welcome! Please read the [CONTRIBUTING.md](CONTRIBUTING.md) fi
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+

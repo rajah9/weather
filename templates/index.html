@@ -118,28 +118,12 @@
             fetch(`/weather/forecast?lat=${lat}&lon=${lon}&unit=${unit}`)
                 .then(response => response.json())
                 .then(data => {
-                    const hourlyDiv = document.getElementById('hourly-forecast');
-                    const dailyDiv = document.getElementById('daily-forecast');
-
-                    // Display hourly data
-                    hourlyDiv.innerHTML = '<h4>Next 24 Hours</h4>';
-                    data.hourly.forEach(hour => {
-                        hourlyDiv.innerHTML += `
-                            <p>${hour.time}: ${hour.temp}${data.unit},
-                            Precipitation: ${hour.precipitation_prob}%,
-                            Conditions: ${hour.weather_desc}</p>`;
-                    });
-
-                    // Display daily data
-                    dailyDiv.innerHTML = '<h4>Daily Overview</h4>';
-                    data.daily.forEach(day => {
-                        dailyDiv.innerHTML += `
-                            <p>${day.date}: High ${day.temp_max}${data.unit},
-                            Low ${day.temp_min}${data.unit},
-                            Precipitation: ${day.precipitation_sum}mm</p>`;
-                    });
-
-                    document.getElementById('forecast-result').style.display = 'block';
+                    const forecastDiv = document.getElementById('forecast-result');
+                    forecastDiv.innerHTML = `
+                        <h3>Weather Forecast</h3>
+                        <div class="narrative">${data.narrative}</div>
+                    `;
+                    forecastDiv.style.display = 'block';
                 })
                 .catch(error => console.error('Error:', error));
         }

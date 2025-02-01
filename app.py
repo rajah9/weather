@@ -3,8 +3,9 @@ from datetime import datetime
 
 import pytz
 import requests
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template
 from flask_restx import Api, Resource, fields
+from openai import OpenAI
 
 # Configure logging
 logging.basicConfig(
@@ -17,8 +18,8 @@ app = Flask(__name__)
 
 # Initialize Flask-RestX
 api = Api(app, version='1.0', title='Weather API',
-    description='A simple weather API with city temperature information',
-    doc='/api')
+          description='A simple weather API with city temperature information',
+          doc='/api')
 
 # Define namespaces
 ns = api.namespace('weather', description='Weather operations')
@@ -47,6 +48,7 @@ _CITIES = {
     "Tokyo, Japan": {"lat": 35.6762, "lon": 139.6503, "default_unit": "celsius", "timezone": "Asia/Tokyo"}
 }
 
+
 def guess_tz(lon: float) -> pytz.timezone:
     """
     Calculate timezone from longitude coordinate
@@ -56,82 +58,99 @@ def guess_tz(lon: float) -> pytz.timezone:
     return pytz.timezone(tz_name)
 
 
-def get_weather_data(lat: float, lon: float, unit: str, city: str = None) -> dict:
+def _call_open_meteo_api(lat: float, lon: float, unit: str, city: str = None, **params) -> dict:
     """
-    Get real weather data from Open-Meteo API with correct local time.
+    Common routine to call Open-Meteo API with validated parameters.
     """
     unit = unit.lower()
     if unit not in _TEMP_UNITS:
         logger.warning(f'Temperature unit "{unit}" is not supported. Using celsius instead.')
-    logger.info(f'Getting weather for lat:{lat}, lon:{lon}, unit:{unit}, city:{city}')
 
-    url = "https://api.open-meteo.com/v1/forecast"
-    params = {
+    logger.info(f'Calling Open-Meteo API for lat:{lat}, lon:{lon}, unit:{unit}, city:{city}')
+
+    base_params = {
         "latitude": lat,
         "longitude": lon,
         "temperature_unit": unit,
-        "current": "temperature_2m",
         "timezone": _CITIES[city]["timezone"] if city in _CITIES else "auto"
     }
 
-    response = requests.get(url, params=params)
-    data = response.json()
+    # Merge base parameters with additional params
+    request_params = {**base_params, **params}
+
+    url = "https://api.open-meteo.com/v1/forecast"
+    response = requests.get(url, params=request_params)
+    return response.json()
+
+
+def get_weather_data(lat: float, lon: float, unit: str, city: str = None) -> dict:
+    """
+    Get current weather data from Open-Meteo API.
+    """
+    data = _call_open_meteo_api(
+        lat=lat,
+        lon=lon,
+        unit=unit,
+        city=city,
+        current="temperature_2m"
+    )
 
     tz = pytz.timezone(_CITIES[city]["timezone"]) if city in _CITIES else guess_tz(lon)
     local_time = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S %Z')
 
     return {
         'temperature': data['current']['temperature_2m'],
-        'unit': '°F' if unit == 'fahrenheit' else '°C',
+        'unit': '°F' if unit.lower() == 'fahrenheit' else '°C',
         'local_time': local_time
     }
 
+
 def get_weather_forecast(lat: float, lon: float, unit: str, city: str = None) -> dict:
     """
-    Get weather forecast data from Open-Meteo API including hourly and daily predictions.
+    Get weather forecast data from Open-Meteo API.
     """
-    unit = unit.lower()
-    logger.info(f'Getting forecast for lat:{lat}, lon:{lon}, unit:{unit}, city:{city}')
+    data = _call_open_meteo_api(
+        lat=lat,
+        lon=lon,
+        unit=unit,
+        city=city,
+        hourly=["temperature_2m", "precipitation_probability", "weathercode"],
+        daily=["temperature_2m_max", "temperature_2m_min", "precipitation_sum"],
+        forecast_days=3
+    )
 
-    url = "https://api.open-meteo.com/v1/forecast"
-    params = {
-        "latitude": lat,
-        "longitude": lon,
-        "temperature_unit": unit,
-        "hourly": ["temperature_2m", "precipitation_probability", "weathercode"],
-        "daily": ["temperature_2m_max", "temperature_2m_min", "precipitation_sum"],
-        "timezone": _CITIES[city]["timezone"] if city in _CITIES else "auto",
-        "forecast_days": 3
-    }
+    # Get current hour index
+    tz = pytz.timezone(_CITIES[city]["timezone"]) if city in _CITIES else guess_tz(lon)
+    current_hour = datetime.now(tz).hour
 
-    response = requests.get(url, params=params)
-    data = response.json()
-
-    # Process hourly data for next 24 hours
-    hourly_forecast = []
-    for i in range(24):
-        hourly_forecast.append({
+    # Create hourly forecast starting from current hour
+    hourly_forecast = [
+        {
             "time": data['hourly']['time'][i],
             "temp": data['hourly']['temperature_2m'][i],
             "precipitation_prob": data['hourly']['precipitation_probability'][i],
             "weather_desc": get_weather_description(data['hourly']['weathercode'][i])
-        })
+        }
+        for i in range(current_hour, current_hour + 24)
+    ]
 
-    # Process daily data
-    daily_forecast = []
-    for i in range(3):
-        daily_forecast.append({
+    # Rest of the code remains the same
+    daily_forecast = [
+        {
             "date": data['daily']['time'][i],
             "temp_max": data['daily']['temperature_2m_max'][i],
             "temp_min": data['daily']['temperature_2m_min'][i],
             "precipitation_sum": data['daily']['precipitation_sum'][i]
-        })
+        }
+        for i in range(3)
+    ]
 
     return {
         "hourly": hourly_forecast,
         "daily": daily_forecast,
-        "unit": '°F' if unit == 'fahrenheit' else '°C'
+        "unit": '°F' if unit.lower() == 'fahrenheit' else '°C'
     }
+
 
 def get_weather_description(code: int) -> str:
     """Convert weather code to human-readable description."""
@@ -155,11 +174,13 @@ def get_weather_description(code: int) -> str:
     }
     return weather_codes.get(code, "Unknown")
 
+
 # HTML interface route
 @app.route('/cities')
 def index():
     logger.info('Loading index page')
     return render_template('index.html', cities=_CITIES)
+
 
 # API routes with Swagger
 @ns.route('/')
@@ -171,14 +192,58 @@ class WeatherResource(Resource):
         args = location_parser.parse_args()
         return get_weather_data(args['lat'], args['lon'], args['unit'])
 
+
 # Add new route in the API section
+def transform_forecast_with_llm(forecast_data: dict, city: str = None) -> str:
+    """
+    Transform weather forecast data into natural language using GPT-3.5-turbo
+    """
+    client = OpenAI()
+
+    # Format the weather data into a readable string
+    weather_info = []
+    for day in forecast_data['daily']:
+        weather_info.append(
+            f"Date: {day['date']}, "
+            f"High: {day['temp_max']}{forecast_data['unit']}, "
+            f"Low: {day['temp_min']}{forecast_data['unit']}, "
+            f"Precipitation: {day['precipitation_sum']}mm"
+        )
+
+    weather_data = "\n".join(weather_info)
+    location = f" for {city}" if city else ""
+
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a friendly meteorologist creating an engaging weather forecast"
+            },
+            {
+                "role": "user",
+                "content": f"Please transform this weather data{location} into a conversational easy to understand narrative:\n{weather_data}"
+            }
+        ]
+    )
+
+    return response.choices[0].message.content
+
 @ns.route('/forecast')
 class WeatherForecastResource(Resource):
     @ns.doc('get_forecast')
     @ns.expect(location_parser)
     def get(self):
         args = location_parser.parse_args()
-        return get_weather_forecast(args['lat'], args['lon'], args['unit'])
+        forecast_data = get_weather_forecast(args['lat'], args['lon'], args['unit'])
+
+        # Get city name if coordinates match a known city
+        city = next((city for city, data in _CITIES.items()
+                    if data['lat'] == args['lat'] and data['lon'] == args['lon']), None)
+
+        forecast_data['narrative'] = transform_forecast_with_llm(forecast_data, city)
+        return forecast_data
+
 if __name__ == '__main__':
     logger.info('Starting Weather App')
     app.run(host='0.0.0.0', port=5000)
