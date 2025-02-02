@@ -70,6 +70,17 @@ making it perfect for outdoor activities. The next couple of days will remain co
 
 Note: This feature requires an OpenAI API key configured in the environment variables.
 
+### Screen shots of the forecast feature
+You can see the forecast feature from the web interface. Start at `http://localhost:5000/cities`.
+
+Here is a screenshot of the forecast feature for the default location: Phoenix, AZ.
+![Forecast for Phoenix, AZ](./images/PHX with forecast.png)
+
+Here is a screenshot of the forecast feature Greenwich, England. Note that the forecast does not mention the city name,
+as the user entered by latitude and longitude.
+![Forecast for Greenwich, England](./images/London by Lon Lat with forecast.png)
+
+
 
 # Build the Docker container:
 ```bash
@@ -85,9 +96,10 @@ docker build -t weather-app .
 ## Setup Instructions
 
 1. Clone the repository:
-   
+ ```bash  
    git clone https://github.com/sourcegraph/weather-api.git
    cd weather-api
+```
 
 2. Build the Docker image:
    
@@ -108,12 +120,13 @@ Endpoint: `/weather`
 Method: `GET`
 
 Query Parameters:
-- `location` (required): City name or coordinates (latitude,longitude)
-- `unit` (optional): 'celsius' or 'fahrenheit' (default: 'celsius')
+- lat: Latitude of the location (required)
+- lon: Longitude of the location (required)
+- unit: Unit of measurement (optional, default is celsius)
 
 Example Request:
 
-GET /weather?location=London&units=metric
+GET /weather?lat=33.4484&lon=-112.0740&unit=fahrenheit
 
 
 Example Response:
@@ -126,6 +139,20 @@ Example Response:
   "description": "Partly cloudy"
 }
 
+## Next Steps
+
+- Add support for more cities worldwide
+- Implement weather alerts and notifications
+- Add historical weather data visualization
+- Include wind speed and humidity metrics
+- Enable user location detection
+- Add multi-language support
+
+## Limitations
+
+- I've hard-coded the API key for OpenAI. In a real-world scenario, this would be stored securely in environment variables. I will remove it by about 2/5/2025. After then, the weather forecasts will have "Undefined."
+- It's not a production-ready application, and does not have a lot of security features, such as rate limiting or authentication.
+- Also, the error handling is not robust.
 
 ## Contributing
 
