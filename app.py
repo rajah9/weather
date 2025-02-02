@@ -83,10 +83,19 @@ def _call_open_meteo_api(lat: float, lon: float, unit: str, city: str = None, **
     return response.json()
 
 
+def validate_coordinates(lat: float, lon: float) -> bool:
+    """
+    Validate latitude and longitude bounds
+    """
+    return -90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0
+
 def get_weather_data(lat: float, lon: float, unit: str, city: str = None) -> dict:
     """
     Get current weather data from Open-Meteo API.
     """
+    if not validate_coordinates(lat, lon):
+        raise ValueError("Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180")
+
     data = _call_open_meteo_api(
         lat=lat,
         lon=lon,
@@ -94,7 +103,6 @@ def get_weather_data(lat: float, lon: float, unit: str, city: str = None) -> dic
         city=city,
         current="temperature_2m"
     )
-
     tz = pytz.timezone(_CITIES[city]["timezone"]) if city in _CITIES else guess_tz(lon)
     local_time = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S %Z')
 
@@ -190,6 +198,8 @@ class WeatherResource(Resource):
     @ns.marshal_with(weather_model)
     def get(self):
         args = location_parser.parse_args()
+        if not validate_coordinates(args['lat'], args['lon']):
+            api.abort(400, "Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180")
         return get_weather_data(args['lat'], args['lon'], args['unit'])
 
 
@@ -198,7 +208,7 @@ def transform_forecast_with_llm(forecast_data: dict, city: str = None) -> str:
     """
     Transform weather forecast data into natural language using GPT-3.5-turbo
     """
-    client = OpenAI()
+    client = OpenAI(api_key='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')
 
     # Format the weather data into a readable string
     weather_info = []
